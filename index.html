@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal PSB Online - Login</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { background-color: #f0fdf4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // API URL Google Apps Script yang sudah dipasang
+        const API_URL = "https://script.google.com/macros/s/AKfycbxfRUW-F3ivvv1l1PUeKnzPdZkWVR6n4pBfcg7TbKhWUeeUzIdvHQGPplTRXKITDIsnjw/exec";
+
+        const AuthScreen = () => {
+            const [isLoginView, setIsLoginView] = React.useState(true);
+            const [isLoading, setIsLoading] = React.useState(false);
+            const [pesan, setPesan] = React.useState({ type: '', text: '' });
+
+            const [loginData, setLoginData] = React.useState({ username: '', password: '' });
+            const [regData, setRegData] = React.useState({
+                namaLengkap: '', noWa: '', password: '', 
+                jenisPendaftar: 'Santri Baru', jenjang: 'SMP', gender: 'Putra', kelasTambahan: ''
+            });
+
+            React.useEffect(() => { setPesan({ type: '', text: '' }); }, [isLoginView]);
+
+            // Mengecek apakah sudah login (bypass login jika sesi masih ada)
+            React.useEffect(() => {
+                const session = localStorage.getItem('psb_session');
+                if (session) {
+                    const parsedSession = JSON.parse(session);
+                    if (parsedSession.role === 'calon_santri') {
+                        window.location.href = 'dashboardPeserta.html';
+                    }
+                }
+            }, []);
+
+            const callAPI = async (action, payload) => {
+                setIsLoading(true);
+                setPesan({ type: '', text: '' });
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action, payload })
+                    });
+                    return await response.json();
+                } catch (error) {
+                    setPesan({ type: 'error', text: 'Gagal terhubung ke server. Periksa koneksi internet.' });
+                    return null;
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                const res = await callAPI('login', loginData);
+                if (res && res.success) {
+                    // Simpan sesi ke Local Storage
+                    localStorage.setItem('psb_session', JSON.stringify({ isLoggedIn: true, role: res.role, user: res.dataUser }));
+                    
+                    setPesan({ type: 'success', text: 'Login berhasil! Mengalihkan...' });
+                    
+                    // Redirect berdasarkan role
+                    setTimeout(() => {
+                        if(res.role === 'calon_santri') {
+                            window.location.href = 'dashboardPeserta.html';
+                        } else {
+                            alert("Dashboard admin belum tersedia");
+                        }
+                    }, 1000);
+                } else if (res) {
+                    setPesan({ type: 'error', text: res.message });
+                }
+            };
+
+            const handleRegister = async (e) => {
+                e.preventDefault();
+                const payload = { ...regData, kelasTambahan: regData.jenisPendaftar === 'Santri Baru' ? '-' : regData.kelasTambahan };
+                const res = await callAPI('register', payload);
+                if (res && res.success) {
+                    setPesan({ type: 'success', text: res.message });
+                    setTimeout(() => { setIsLoginView(true); }, 2500);
+                } else if (res) {
+                    setPesan({ type: 'error', text: res.message });
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in">
+                        <div className="bg-green-600 p-6 text-center text-white">
+                            <i className="fa-solid fa-graduation-cap text-4xl mb-2"></i>
+                            <h1 className="text-2xl font-bold">Portal PSB Online</h1>
+                            <p className="text-green-100 text-sm mt-1">Penerimaan Santri Baru</p>
+                        </div>
+                        <div className="p-6 md:p-8">
+                            {pesan.text && (
+                                <div className={`p-4 rounded-lg mb-6 text-sm flex items-start gap-2 ${pesan.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                                    <i className={`fa-solid mt-0.5 ${pesan.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}`}></i>
+                                    <span className="font-medium">{pesan.text}</span>
+                                </div>
+                            )}
+
+                            {isLoginView ? (
+                                <form onSubmit={handleLogin} className="space-y-5">
+                                    <h2 className="text-xl font-bold text-gray-800 mb-2">Masuk ke Akun</h2>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Nomor WhatsApp</label>
+                                        <input type="text" required className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                                        <input type="password" required className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})} />
+                                    </div>
+                                    <button type="submit" disabled={isLoading} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded-lg transition-colors flex justify-center gap-2">
+                                        {isLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-right-to-bracket"></i>} Masuk Dashboard
+                                    </button>
+                                    <div className="text-center mt-4">
+                                        <button type="button" onClick={() => setIsLoginView(false)} className="text-green-600 font-bold hover:text-green-800">Buat Akun Santri Baru</button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <form onSubmit={handleRegister} className="space-y-4 text-sm">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <button type="button" onClick={() => setIsLoginView(true)} className="text-gray-500 hover:text-gray-800"><i className="fa-solid fa-arrow-left"></i></button>
+                                        <h2 className="text-xl font-bold text-gray-800">Pendaftaran Akun</h2>
+                                    </div>
+                                    {/* Opsi Jalur Pendaftaran */}
+                                    <div>
+                                        <label className="block font-semibold text-gray-700 mb-2">Jalur Pendaftaran</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['Santri Baru', 'Mutasi', 'Inden'].map((jenis) => (
+                                                <button key={jenis} type="button" onClick={() => setRegData({...regData, jenisPendaftar: jenis, kelasTambahan: ''})} className={`py-2 rounded-lg border font-medium ${regData.jenisPendaftar === jenis ? 'bg-indigo-50 border-indigo-600 text-indigo-700' : 'bg-white'}`}>{jenis}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block font-semibold text-gray-700 mb-2">Jenjang</label>
+                                            <div className="flex bg-gray-100 p-1 rounded-lg">
+                                                {['SMP', 'MA'].map((lvl) => (
+                                                    <button key={lvl} type="button" onClick={() => setRegData({...regData, jenjang: lvl, kelasTambahan: ''})} className={`flex-1 py-1.5 rounded font-medium ${regData.jenjang === lvl ? 'bg-white shadow text-indigo-700' : 'text-gray-500'}`}>{lvl}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold text-gray-700 mb-2">Jenis Kelamin</label>
+                                            <div className="flex bg-gray-100 p-1 rounded-lg">
+                                                {['Putra', 'Putri'].map((jk) => (
+                                                    <button key={jk} type="button" onClick={() => setRegData({...regData, gender: jk})} className={`flex-1 py-1.5 rounded font-medium ${regData.gender === jk ? 'bg-white shadow text-indigo-700' : 'text-gray-500'}`}>{jk}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {regData.jenisPendaftar === 'Mutasi' && (
+                                        <div>
+                                            <label className="block font-semibold text-gray-700 mb-1">Kelas Tujuan Mutasi</label>
+                                            <select required className="w-full p-2 border rounded" value={regData.kelasTambahan} onChange={e => setRegData({...regData, kelasTambahan: e.target.value})}>
+                                                <option value="">-- Pilih Kelas --</option>
+                                                {regData.jenjang === 'SMP' ? (
+                                                    <><option value="Kelas 7">Kelas 7</option><option value="Kelas 8">Kelas 8</option><option value="Kelas 9">Kelas 9</option></>
+                                                ) : (
+                                                    <><option value="Kelas 10">Kelas 10</option><option value="Kelas 11">Kelas 11</option><option value="Kelas 12">Kelas 12</option></>
+                                                )}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="block font-semibold text-gray-700 mb-1">Nama Lengkap</label>
+                                        <input type="text" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" value={regData.namaLengkap} onChange={e => setRegData({...regData, namaLengkap: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold text-gray-700 mb-1">No. WhatsApp</label>
+                                        <input type="text" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" value={regData.noWa} onChange={e => setRegData({...regData, noWa: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold text-gray-700 mb-1">Password</label>
+                                        <input type="password" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} />
+                                    </div>
+                                    <button type="submit" disabled={isLoading} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded-lg mt-4">{isLoading ? 'Menyimpan...' : 'Daftar Akun'}</button>
+                                </form>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AuthScreen />);
+    </script>
+</body>
+</html>
