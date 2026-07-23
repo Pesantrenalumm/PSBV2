@@ -32,7 +32,6 @@
 
             const [loginData, setLoginData] = React.useState({ username: '', password: '' });
             
-            // Kolom password dihapus dari state registrasi
             const [regData, setRegData] = React.useState({
                 namaLengkap: '', noWa: '', 
                 jenisPendaftar: 'Santri Baru', jenjang: 'SMP', gender: 'Putra', kelasTambahan: ''
@@ -88,7 +87,6 @@
                 const res = await callAPI('register', payload);
                 if (res && res.success) {
                     setPesan({ type: 'success', text: res.message });
-                    // Tunda 5 detik agar peserta sempat membaca notifikasi
                     setTimeout(() => { setIsLoginView(true); }, 5000);
                 } else if (res) {
                     setPesan({ type: 'error', text: res.message });
@@ -207,11 +205,13 @@
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* Modifikasi Logika untuk Mutasi */}
                                         {regData.jenisPendaftar === 'Mutasi' && (
                                             <div>
                                                 <label className="block font-bold text-gray-700 mb-1">Kelas Tujuan Mutasi</label>
                                                 <select required className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#4f46e5]" value={regData.kelasTambahan} onChange={e => setRegData({...regData, kelasTambahan: e.target.value})}>
-                                                    <option value="">-- Pilih Kelas --</option>
+                                                    <option value="">-- Pilih Kelas Tujuan --</option>
                                                     {regData.jenjang === 'SMP' ? (
                                                         <><option value="Kelas 7">Kelas 7</option><option value="Kelas 8">Kelas 8</option><option value="Kelas 9">Kelas 9</option></>
                                                     ) : (
@@ -220,6 +220,22 @@
                                                 </select>
                                             </div>
                                         )}
+
+                                        {/* Modifikasi Logika Baru untuk Inden */}
+                                        {regData.jenisPendaftar === 'Inden' && (
+                                            <div>
+                                                <label className="block font-bold text-gray-700 mb-1">Kelas Saat Ini (Sekarang)</label>
+                                                <select required className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#4f46e5]" value={regData.kelasTambahan} onChange={e => setRegData({...regData, kelasTambahan: e.target.value})}>
+                                                    <option value="">-- Pilih Kelas Saat Ini --</option>
+                                                    {regData.jenjang === 'SMP' ? (
+                                                        <><option value="Kelas 4 SD/MI">Kelas 4 SD/MI</option><option value="Kelas 5 SD/MI">Kelas 5 SD/MI</option><option value="Kelas 6 SD/MI">Kelas 6 SD/MI</option></>
+                                                    ) : (
+                                                        <><option value="Kelas 7 SMP/MTs">Kelas 7 SMP/MTs</option><option value="Kelas 8 SMP/MTs">Kelas 8 SMP/MTs</option><option value="Kelas 9 SMP/MTs">Kelas 9 SMP/MTs</option></>
+                                                    )}
+                                                </select>
+                                            </div>
+                                        )}
+
                                         <div>
                                             <label className="block font-bold text-gray-700 mb-1 mt-2">Nama Lengkap Santri</label>
                                             <input type="text" required placeholder="Sesuai Akta Kelahiran" className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#4f46e5]" value={regData.namaLengkap} onChange={e => setRegData({...regData, namaLengkap: e.target.value})} />
