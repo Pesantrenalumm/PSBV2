@@ -25,7 +25,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // GANTI DENGAN URL WEB APP GAS ANDA
+        // WAJIB GANTI DENGAN URL WEB APP GAS ANDA
         const API_URL = "https://script.google.com/macros/s/AKfycbxfRUW-F3ivvv1l1PUeKnzPdZkWVR6n4pBfcg7TbKhWUeeUzIdvHQGPplTRXKITDIsnjw/exec";
 
         const DashboardScreen = () => {
@@ -33,7 +33,26 @@
             const [activeTab, setActiveTab] = React.useState('home');
             const [dataServer, setDataServer] = React.useState(null);
             const [isLoadingData, setIsLoadingData] = React.useState(true);
-            const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false); // State untuk Hamburger Menu
+            const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false); 
+            const [isProfileMenuOpen, setIsProfileMenuOpen] = React.useState(false);
+
+            // State untuk Notifikasi Global
+            const [pesan, setPesan] = React.useState({ type: '', text: '' });
+
+            // State Biodata
+            const [isSavingBiodata, setIsSavingBiodata] = React.useState(false);
+            const [biodata, setBiodata] = React.useState({
+                nisn: '', nik: '', tempatLahir: '', tanggalLahir: '',
+                namaAyah: '', pekerjaanAyah: '', noWaAyah: '',
+                namaIbu: '', pekerjaanIbu: '', noWaIbu: '',
+                asalSekolah: '', npsnSekolah: '', alamatLengkap: ''
+            });
+
+            // State Ganti Password
+            const [showPwdModal, setShowPwdModal] = React.useState(false);
+            const [isSavingPwd, setIsSavingPwd] = React.useState(false);
+            const [pwdData, setPwdData] = React.useState({ lama: '', baru: '', konfirmasi: '' });
+            const [pwdPesan, setPwdPesan] = React.useState({ type: '', text: '' });
 
             React.useEffect(() => {
                 const savedSession = localStorage.getItem('psb_session');
@@ -43,7 +62,6 @@
                 }
                 const parsedSession = JSON.parse(savedSession);
                 setSession(parsedSession);
-                // Menarik data menggunakan UserID
                 fetchData(parsedSession.user.userID);
             }, []);
 
@@ -55,11 +73,29 @@
                         body: JSON.stringify({ action: 'getDataPeserta', payload: { userID: userID } })
                     });
                     const res = await response.json();
-                    if(res.success) setDataServer(res.dataUser);
+                    if(res.success) {
+                        setDataServer(res.dataUser);
+                        // Jika sudah ada biodata tersimpan sebelumnya, masukkan ke form
+                        if(res.dataUser.biodataLengkap && Object.keys(res.dataUser.biodataLengkap).length > 0) {
+                            setBiodata(res.dataUser.biodataLengkap);
+                        }
+                    }
                 } catch(err) {
                     console.error("Gagal menarik data dari server.");
                 } finally {
                     setIsLoadingData(false);
+                }
+            };
+
+            const callAPI = async (action, payload) => {
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action, payload })
+                    });
+                    return await response.json();
+                } catch (error) {
+                    return { success: false, message: 'Gagal terhubung ke server.' };
                 }
             };
 
@@ -70,8 +106,56 @@
 
             const handleTabClick = (tabId) => {
                 setActiveTab(tabId);
-                setIsMobileMenuOpen(false); // Otomatis tutup menu di HP setelah klik
-            }
+                setIsMobileMenuOpen(false); 
+                setPesan({ type: '', text: '' });
+            };
+
+            // FUNGSI SIMPAN BIODATA
+            const handleSimpanBiodata = async (e) => {
+                e.preventDefault();
+                setIsSavingBiodata(true);
+                setPesan({ type: '', text: '' });
+                
+                const res = await callAPI('simpanBiodata', { userID: dataServer.userID, biodata: biodata });
+                
+                setIsSavingBiodata(false);
+                if(res && res.success) {
+                    setPesan({ type: 'success', text: 'Alhamdulillah, Biodata berhasil disimpan!' });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    setPesan({ type: 'error', text: res ? res.message : 'Terjadi kesalahan sistem.' });
+                }
+            };
+
+            // FUNGSI GANTI PASSWORD
+            const handleGantiPassword = async (e) => {
+                e.preventDefault();
+                setPwdPesan({ type: '', text: '' });
+
+                if(pwdData.baru !== pwdData.konfirmasi) {
+                    setPwdPesan({ type: 'error', text: 'Password Baru dan Konfirmasi tidak cocok!' });
+                    return;
+                }
+                if(pwdData.baru.length < 6) {
+                    setPwdPesan({ type: 'error', text: 'Password baru minimal 6 karakter.' });
+                    return;
+                }
+
+                setIsSavingPwd(true);
+                const res = await callAPI('gantiPassword', { userID: dataServer.userID, passwordLama: pwdData.lama, passwordBaru: pwdData.baru });
+                setIsSavingPwd(false);
+
+                if(res && res.success) {
+                    setPwdPesan({ type: 'success', text: 'Password berhasil diganti!' });
+                    setTimeout(() => {
+                        setShowPwdModal(false);
+                        setPwdData({ lama: '', baru: '', konfirmasi: '' });
+                        setPwdPesan({ type: '', text: '' });
+                    }, 2000);
+                } else {
+                    setPwdPesan({ type: 'error', text: res ? res.message : 'Gagal mengganti password.' });
+                }
+            };
 
             if (isLoadingData || !dataServer) {
                 return (
@@ -86,6 +170,8 @@
             const initialName = dataServer.nama.charAt(0).toUpperCase();
             
             let currentStep = 1;
+            // Jika biodata sudah diisi, naikkan progres ke step 2 (Pembayaran)
+            if (biodata.nisn && biodata.namaAyah) currentStep = 2;
             if (dataServer.statusPembayaran === 'Lunas') currentStep = 3;
             else if (dataServer.statusPembayaran === 'Menunggu Verifikasi') currentStep = 2;
 
@@ -101,18 +187,15 @@
                     
                     {/* OVERLAY HITAM UNTUK MENU HP */}
                     {isMobileMenuOpen && (
-                        <div className="fixed inset-0 bg-black/50 z-20 md:hidden transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
+                        <div className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
                     )}
 
-                    {/* SIDEBAR (Slide in/out untuk HP, Fixed untuk PC) */}
-                    <div className={`fixed inset-y-0 left-0 bg-white w-72 flex flex-col shadow-2xl md:shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-30 transform transition-transform duration-300 md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} border-r border-gray-100`}>
-                        
+                    {/* SIDEBAR */}
+                    <div className={`fixed inset-y-0 left-0 bg-white w-72 flex flex-col shadow-2xl md:shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} border-r border-gray-100`}>
                         <div className="p-8 flex flex-col items-center border-b border-gray-50 relative">
-                            {/* Tombol Tutup Sidebar untuk HP */}
                             <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
                                 <i className="fa-solid fa-xmark text-xl"></i>
                             </button>
-
                             <div className="text-[#059669] mb-2"><i className="fa-solid fa-graduation-cap text-4xl"></i></div>
                             <h2 className="font-extrabold text-xl text-gray-800 tracking-tight">PSB Online</h2>
                             <p className="text-[10px] font-bold text-gray-400 tracking-widest mt-1">DASHBOARD SANTRI</p>
@@ -128,9 +211,7 @@
                             
                             <button onClick={() => { if(!isTesLocked) handleTabClick('tes'); }} 
                                 className={`w-full flex items-center justify-between px-6 py-3.5 rounded-xl text-left font-semibold transition-all mt-1 ${activeTab === 'tes' ? 'bg-[#059669] text-white shadow-md' : (isTesLocked ? 'text-gray-400 cursor-not-allowed' : 'text-gray-500 hover:bg-emerald-50 hover:text-[#059669]')}`}>
-                                <div className="flex items-center gap-4">
-                                    <i className={`fa-solid fa-calendar-check w-5 text-center text-lg`}></i> Jadwal & Tes
-                                </div>
+                                <div className="flex items-center gap-4"><i className={`fa-solid fa-calendar-check w-5 text-center text-lg`}></i> Jadwal & Tes</div>
                                 {isTesLocked && <i className="fa-solid fa-lock text-sm opacity-50"></i>}
                             </button>
 
@@ -139,7 +220,6 @@
                                 <i className="fa-solid fa-bullhorn w-5 text-center text-lg"></i> Pengumuman
                             </button>
                         </nav>
-
                         <div className="p-6">
                             <button onClick={handleLogout} className="w-full flex items-center gap-4 px-6 py-3 rounded-xl text-red-500 font-semibold hover:bg-red-50 transition-colors">
                                 <i className="fa-solid fa-arrow-right-from-bracket w-5 text-center text-lg"></i> Keluar Aplikasi
@@ -149,27 +229,52 @@
 
                     {/* KONTEN UTAMA */}
                     <div className="flex-1 overflow-y-auto h-screen relative">
-                        {/* Header Atas */}
-                        <div className="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-4 md:px-8 py-4 md:py-5 flex justify-between items-center border-b border-gray-100 shadow-sm">
+                        {/* Header Atas & Menu Profil */}
+                        <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 px-4 md:px-8 py-4 md:py-5 flex justify-between items-center border-b border-gray-100 shadow-sm">
                             <div className="flex items-center gap-4">
-                                {/* Hamburger Button untuk HP */}
                                 <button className="md:hidden text-gray-600 hover:text-[#059669] focus:outline-none" onClick={() => setIsMobileMenuOpen(true)}>
                                     <i className="fa-solid fa-bars text-2xl"></i>
                                 </button>
                                 <h1 className="text-xl md:text-2xl font-extrabold text-gray-800 capitalize hidden sm:block">{activeTab === 'home' ? 'Beranda' : activeTab.replace('-', ' ')}</h1>
                             </div>
                             
-                            <div className="flex items-center gap-3 bg-white border border-gray-100 py-1.5 pl-1.5 pr-4 rounded-full shadow-sm">
-                                <div className="w-10 h-10 rounded-full bg-emerald-100 text-[#059669] flex items-center justify-center font-bold text-lg">{initialName}</div>
-                                <div>
-                                    <p className="text-sm font-bold text-gray-700 leading-tight">{dataServer.nama}</p>
-                                    <p className="text-[11px] text-gray-500 font-mono tracking-wider">{dataServer.userID}</p>
-                                </div>
+                            <div className="relative">
+                                <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="flex items-center gap-3 bg-white border border-gray-100 hover:border-emerald-200 py-1.5 pl-1.5 pr-4 rounded-full shadow-sm transition-all focus:outline-none">
+                                    <div className="w-10 h-10 rounded-full bg-emerald-100 text-[#059669] flex items-center justify-center font-bold text-lg">{initialName}</div>
+                                    <div className="hidden md:block text-left">
+                                        <p className="text-sm font-bold text-gray-700 leading-tight">{dataServer.nama}</p>
+                                        <p className="text-[11px] text-gray-500 font-mono tracking-wider">{dataServer.userID}</p>
+                                    </div>
+                                    <i className="fa-solid fa-chevron-down text-gray-400 text-xs ml-2 hidden md:block"></i>
+                                </button>
+                                
+                                {/* Dropdown Menu Profil */}
+                                {isProfileMenuOpen && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 animate-fade-in">
+                                        <button onClick={() => { setShowPwdModal(true); setIsProfileMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-[#059669]">
+                                            <i className="fa-solid fa-key w-5 text-center mr-2"></i> Ganti Password
+                                        </button>
+                                        <div className="border-t border-gray-100 my-1"></div>
+                                        <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                            <i className="fa-solid fa-right-from-bracket w-5 text-center mr-2"></i> Keluar
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         {/* Area Konten Dinamis */}
-                        <div className="p-4 md:p-8 max-w-5xl mx-auto animate-fade-in">
+                        <div className="p-4 md:p-8 max-w-5xl mx-auto animate-fade-in pb-20">
+                            
+                            {/* Alert Global Pesan */}
+                            {pesan.text && (
+                                <div className={`p-4 rounded-xl mb-6 text-sm flex items-start gap-3 border shadow-sm ${pesan.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-[#059669] border-emerald-200'}`}>
+                                    <i className={`fa-solid mt-0.5 ${pesan.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}`}></i>
+                                    <span className="font-bold">{pesan.text}</span>
+                                </div>
+                            )}
+
+                            {/* TAB: BERANDA */}
                             {activeTab === 'home' && (
                                 <div className="space-y-6">
                                     <div className="bg-[#059669] rounded-2xl p-6 md:p-8 text-white shadow-lg shadow-emerald-200 relative overflow-hidden">
@@ -189,7 +294,7 @@
                                             <div className={`p-6 rounded-2xl border-2 ${currentStep >= 1 ? 'border-emerald-100 bg-emerald-50/50' : 'border-gray-50 bg-gray-50'}`}>
                                                 <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center text-xl font-bold mb-3 ${currentStep >= 1 ? 'bg-emerald-100 text-[#059669]' : 'bg-gray-200 text-gray-400'}`}>1</div>
                                                 <h4 className={`font-bold ${currentStep >= 1 ? 'text-gray-800' : 'text-gray-400'}`}>Biodata & Berkas</h4>
-                                                <p className="text-xs text-gray-500 mt-1">Harap lengkapi</p>
+                                                <p className="text-xs mt-1 text-gray-500">{biodata.nisn ? 'Telah Diisi' : 'Harap Lengkapi'}</p>
                                             </div>
                                             <div className={`p-6 rounded-2xl border-2 ${currentStep >= 2 ? 'border-emerald-100 bg-emerald-50/50' : 'border-gray-50 bg-gray-50'}`}>
                                                 <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center text-xl font-bold mb-3 ${currentStep >= 2 ? 'bg-emerald-100 text-[#059669]' : 'bg-gray-200 text-gray-400'}`}>2</div>
@@ -205,36 +310,191 @@
                                             </div>
                                         </div>
                                     </div>
-
-                                    <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <i className="fa-solid fa-bell text-yellow-500 text-xl"></i>
-                                            <h3 className="font-bold text-gray-800 text-lg">Pengumuman Terbaru</h3>
-                                        </div>
-                                        
-                                        <div className="bg-red-50/50 border border-red-100 rounded-xl p-5">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h4 className="font-bold text-gray-800">Batas Akhir Pembayaran</h4>
-                                                <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">Penting</span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 mb-3">Harap segera menyelesaikan pembayaran pendaftaran agar dapat mengikuti tes seleksi.</p>
-                                            <p className="text-xs text-gray-400">23 Jul 2026</p>
-                                        </div>
-                                    </div>
                                 </div>
                             )}
 
-                            {activeTab !== 'home' && (
+                            {/* TAB: BIODATA */}
+                            {activeTab === 'biodata' && (
+                                <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
+                                    <div className="mb-8 border-b border-gray-100 pb-4">
+                                        <h2 className="text-2xl font-extrabold text-gray-800">Formulir Biodata Santri</h2>
+                                        <p className="text-gray-500 mt-1 text-sm">Harap isi data dengan sebenar-benarnya sesuai dengan dokumen KK dan Akta Kelahiran.</p>
+                                    </div>
+
+                                    <form onSubmit={handleSimpanBiodata} className="space-y-8">
+                                        
+                                        {/* Bagian 1: Data Diri */}
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-4 text-[#059669]">
+                                                <i className="fa-solid fa-user-graduate"></i>
+                                                <h3 className="font-bold text-lg">A. Data Diri Santri</h3>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">NISN (Nomor Induk Siswa Nasional)</label>
+                                                    <input type="number" required className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#059669] bg-gray-50 focus:bg-white" value={biodata.nisn} onChange={e => setBiodata({...biodata, nisn: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">NIK (Nomor Induk Kependudukan)</label>
+                                                    <input type="number" required className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#059669] bg-gray-50 focus:bg-white" value={biodata.nik} onChange={e => setBiodata({...biodata, nik: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">Tempat Lahir</label>
+                                                    <input type="text" required className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#059669] bg-gray-50 focus:bg-white" value={biodata.tempatLahir} onChange={e => setBiodata({...biodata, tempatLahir: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">Tanggal Lahir</label>
+                                                    <input type="date" required className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#059669] bg-gray-50 focus:bg-white" value={biodata.tanggalLahir} onChange={e => setBiodata({...biodata, tanggalLahir: e.target.value})} />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <hr className="border-gray-100" />
+
+                                        {/* Bagian 2: Data Orang Tua */}
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-4 text-[#059669]">
+                                                <i className="fa-solid fa-users"></i>
+                                                <h3 className="font-bold text-lg">B. Data Orang Tua / Wali</h3>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-6">
+                                                {/* Data Ayah */}
+                                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
+                                                    <h4 className="font-bold text-gray-600 border-b pb-2">Data Ayah</h4>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-700 mb-1">Nama Lengkap Ayah</label>
+                                                        <input type="text" required className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#059669]" value={biodata.namaAyah} onChange={e => setBiodata({...biodata, namaAyah: e.target.value})} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-700 mb-1">Pekerjaan Ayah</label>
+                                                        <select required className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#059669]" value={biodata.pekerjaanAyah} onChange={e => setBiodata({...biodata, pekerjaanAyah: e.target.value})}>
+                                                            <option value="">-- Pilih --</option>
+                                                            <option value="PNS/TNI/POLRI">PNS/TNI/POLRI</option>
+                                                            <option value="Karyawan Swasta">Karyawan Swasta</option>
+                                                            <option value="Wiraswasta/Pedagang">Wiraswasta/Pedagang</option>
+                                                            <option value="Petani/Nelayan">Petani/Nelayan</option>
+                                                            <option value="Buruh">Buruh</option>
+                                                            <option value="Lainnya">Lainnya</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-700 mb-1">No. WhatsApp Ayah</label>
+                                                        <input type="text" required className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#059669]" value={biodata.noWaAyah} onChange={e => setBiodata({...biodata, noWaAyah: e.target.value})} />
+                                                    </div>
+                                                </div>
+
+                                                {/* Data Ibu */}
+                                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
+                                                    <h4 className="font-bold text-gray-600 border-b pb-2">Data Ibu</h4>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-700 mb-1">Nama Lengkap Ibu</label>
+                                                        <input type="text" required className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#059669]" value={biodata.namaIbu} onChange={e => setBiodata({...biodata, namaIbu: e.target.value})} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-700 mb-1">Pekerjaan Ibu</label>
+                                                        <select required className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#059669]" value={biodata.pekerjaanIbu} onChange={e => setBiodata({...biodata, pekerjaanIbu: e.target.value})}>
+                                                            <option value="">-- Pilih --</option>
+                                                            <option value="Ibu Rumah Tangga">Ibu Rumah Tangga</option>
+                                                            <option value="PNS/TNI/POLRI">PNS/TNI/POLRI</option>
+                                                            <option value="Karyawan Swasta">Karyawan Swasta</option>
+                                                            <option value="Wiraswasta/Pedagang">Wiraswasta/Pedagang</option>
+                                                            <option value="Lainnya">Lainnya</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-700 mb-1">No. WhatsApp Ibu</label>
+                                                        <input type="text" required className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#059669]" value={biodata.noWaIbu} onChange={e => setBiodata({...biodata, noWaIbu: e.target.value})} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <hr className="border-gray-100" />
+
+                                        {/* Bagian 3: Asal Sekolah & Alamat */}
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-4 text-[#059669]">
+                                                <i className="fa-solid fa-school"></i>
+                                                <h3 className="font-bold text-lg">C. Data Asal Sekolah & Domisili</h3>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">Nama Asal Sekolah (SD/MI/SMP/MTs)</label>
+                                                    <input type="text" required className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#059669] bg-gray-50 focus:bg-white" value={biodata.asalSekolah} onChange={e => setBiodata({...biodata, asalSekolah: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">NPSN Asal Sekolah <span className="text-gray-400 font-normal">(opsional)</span></label>
+                                                    <input type="number" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#059669] bg-gray-50 focus:bg-white" value={biodata.npsnSekolah} onChange={e => setBiodata({...biodata, npsnSekolah: e.target.value})} />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-1">Alamat Lengkap Rumah Saat Ini</label>
+                                                <textarea rows="3" required placeholder="Nama Jalan, RT/RW, Desa, Kecamatan, Kota/Kabupaten, Provinsi" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#059669] bg-gray-50 focus:bg-white resize-none" value={biodata.alamatLengkap} onChange={e => setBiodata({...biodata, alamatLengkap: e.target.value})}></textarea>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4">
+                                            <button type="submit" disabled={isSavingBiodata} className="w-full md:w-auto px-8 py-3.5 bg-[#059669] hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-3">
+                                                {isSavingBiodata ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-floppy-disk"></i>}
+                                                {isSavingBiodata ? 'Menyimpan Data...' : 'Simpan Biodata Permanen'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
+
+                            {/* TAB LAIN YANG BELUM DIBANGUN */}
+                            {['pembayaran', 'berkas', 'tes'].includes(activeTab) && (
                                 <div className="bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[400px] text-center">
                                     <div className="w-20 h-20 bg-[#eef8f1] rounded-full flex items-center justify-center text-[#059669] text-3xl mb-4">
                                         <i className="fa-solid fa-person-digging"></i>
                                     </div>
-                                    <h3 className="text-xl font-bold text-gray-700 mb-2">Modul {activeTab}</h3>
-                                    <p className="text-gray-500 max-w-md text-sm md:text-base">Halaman ini sedang dalam tahap pengembangan desain dan akan segera dirilis oleh sistem.</p>
+                                    <h3 className="text-xl font-bold text-gray-700 mb-2">Modul {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3>
+                                    <p className="text-gray-500 max-w-md text-sm md:text-base">Tahapan perancangan sistem unggah file Google Drive akan segera dibangun di halaman ini.</p>
                                 </div>
                             )}
                         </div>
                     </div>
+
+                    {/* MODAL GANTI PASSWORD */}
+                    {showPwdModal && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowPwdModal(false)}></div>
+                            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
+                                <div className="bg-gray-50 border-b border-gray-100 px-6 py-4 flex justify-between items-center">
+                                    <h3 className="font-bold text-gray-800 text-lg">Ganti Password</h3>
+                                    <button onClick={() => setShowPwdModal(false)} className="text-gray-400 hover:text-gray-600"><i className="fa-solid fa-xmark text-xl"></i></button>
+                                </div>
+                                <form onSubmit={handleGantiPassword} className="p-6 space-y-4">
+                                    {pwdPesan.text && (
+                                        <div className={`p-3 rounded-lg text-sm mb-2 ${pwdPesan.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                            <i className={`fa-solid mr-2 ${pwdPesan.type === 'error' ? 'fa-triangle-exclamation' : 'fa-check'}`}></i>
+                                            {pwdPesan.text}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-1">Password Lama (Yang dikirim di WA)</label>
+                                        <input type="password" required className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#059669] bg-gray-50 focus:bg-white" value={pwdData.lama} onChange={e => setPwdData({...pwdData, lama: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-1">Password Baru (Min. 6 Karakter)</label>
+                                        <input type="password" minLength="6" required className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#059669] bg-gray-50 focus:bg-white" value={pwdData.baru} onChange={e => setPwdData({...pwdData, baru: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-1">Konfirmasi Password Baru</label>
+                                        <input type="password" minLength="6" required className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#059669] bg-gray-50 focus:bg-white" value={pwdData.konfirmasi} onChange={e => setPwdData({...pwdData, konfirmasi: e.target.value})} />
+                                    </div>
+                                    <div className="pt-2">
+                                        <button type="submit" disabled={isSavingPwd} className="w-full bg-[#059669] hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-colors">
+                                            {isSavingPwd ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : null}
+                                            {isSavingPwd ? 'Menyimpan...' : 'Perbarui Password'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
                 </div>
             );
         };
