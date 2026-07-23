@@ -58,8 +58,10 @@
             const [fileBayar, setFileBayar] = React.useState(null);
             const [isUploadingBayar, setIsUploadingBayar] = React.useState(false);
 
-            // State Upload Berkas
-            const [fileBerkas, setFileBerkas] = React.useState(null);
+            // State Upload Berkas Dipisah
+            const [fileNisn, setFileNisn] = React.useState(null);
+            const [fileKk, setFileKk] = React.useState(null);
+            const [fileAkta, setFileAkta] = React.useState(null);
             const [isUploadingBerkas, setIsUploadingBerkas] = React.useState(false);
 
             React.useEffect(() => {
@@ -220,31 +222,49 @@
             };
 
             // FUNGSI UNGGAH BERKAS
-            const handleUploadBerkas = async (e) => {
-                e.preventDefault();
-                if (!fileBerkas) return;
-                setIsUploadingBerkas(true);
-                setPesan({ type: '', text: '' });
+const handleUploadBerkas = async (e) => {
+    e.preventDefault();
+    if (!fileNisn || !fileKk || !fileAkta) {
+        setPesan({ type: 'error', text: 'Harap unggah ketiga berkas (NISN, KK, Akta)!' });
+        return;
+    }
+    
+    setIsUploadingBerkas(true);
+    setPesan({ type: '', text: '' });
 
-                const payload = {
-                    userID: dataServer.userID,
-                    jenis: 'berkas',
-                    fileName: fileBerkas.name,
-                    mimeType: fileBerkas.mimeType,
-                    base64Data: fileBerkas.data
-                };
+    try {
+        // Kumpulkan 3 file menjadi array
+        const files = [
+            { jenis: 'berkas_nisn', name: 'NISN_' + fileNisn.name, mime: fileNisn.mimeType, data: fileNisn.data },
+            { jenis: 'berkas_kk', name: 'KK_' + fileKk.name, mime: fileKk.mimeType, data: fileKk.data },
+            { jenis: 'berkas_akta', name: 'AKTA_' + fileAkta.name, mime: fileAkta.mimeType, data: fileAkta.data }
+        ];
 
-                const res = await callAPI('uploadFile', payload);
-                setIsUploadingBerkas(false);
+        let urls = [];
+        // Upload satu per satu ke Drive
+        for (let file of files) {
+            const res = await callAPI('uploadFile', {
+                userID: dataServer.userID, jenis: file.jenis,
+                fileName: file.name, mimeType: file.mime, base64Data: file.data
+            });
+            if(res && res.success) urls.push(res.fileUrl);
+            else throw new Error('Gagal unggah ' + file.name);
+        }
 
-                if (res && res.success) {
-                    setPesan({ type: 'success', text: 'Berkas berhasil diunggah dan menunggu verifikasi panitia!' });
-                    setDataServer({...dataServer, statusBerkas: 'Menunggu Verifikasi'});
-                    setFileBerkas(null);
-                } else {
-                    setPesan({ type: 'error', text: res ? res.message : 'Gagal mengunggah file.' });
-                }
-            };
+        // Jika 3 file sukses diunggah, panggil API baru untuk simpan 3 link (kita buat nanti di Code.gs)
+        const resSimpan = await callAPI('simpanTigaBerkas', { userID: dataServer.userID, links: urls });
+        
+        if (resSimpan.success) {
+            setPesan({ type: 'success', text: 'Ketiga berkas berhasil diunggah!' });
+            setDataServer({...dataServer, statusBerkas: 'Menunggu Verifikasi'});
+            setFileNisn(null); setFileKk(null); setFileAkta(null);
+        }
+    } catch (error) {
+        setPesan({ type: 'error', text: 'Gagal mengunggah berkas. Coba lagi.' });
+    } finally {
+        setIsUploadingBerkas(false);
+    }
+};
 
             if (isLoadingData || !dataServer) {
                 return (
@@ -493,35 +513,58 @@
                                         ) : (
                                             <form onSubmit={handleUploadBerkas} className="mt-6">
                                                 <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-6">
-                                                    <h4 className="font-bold text-blue-800 mb-1 text-sm"><i className="fa-solid fa-circle-info mr-2"></i>Instruksi:</h4>
-                                                    <p className="text-xs text-blue-700">Scan/Foto Kartu Keluarga (KK) dan Akta Kelahiran. Jadikan 1 file PDF, atau unggah foto KK terlebih dahulu. Maksimal ukuran 2MB.</p>
-                                                </div>
+    <h4 className="font-bold text-blue-800 mb-1 text-sm"><i className="fa-solid fa-circle-info mr-2"></i>Instruksi:</h4>
+    <p className="text-xs text-blue-700">Unggah foto/scan dokumen asli. Pastikan tulisan terbaca jelas. Format JPG/PNG/PDF (Maks 2MB per file).</p>
+</div>
 
-                                                <label className="block text-sm font-bold text-gray-700 mb-2">Unggah File (JPG/PNG/PDF)</label>
-                                                <div className="file-drop-area relative p-8 rounded-2xl bg-gray-50 text-center cursor-pointer mb-6">
-                                                    <input type="file" required accept="image/jpeg, image/png, application/pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => handleFileSelect(e, setFileBerkas)} />
-                                                    
-                                                    {fileBerkas ? (
-                                                        <div>
-                                                            {fileBerkas.preview ? (
-                                                                <img src={fileBerkas.preview} alt="Preview" className="h-40 mx-auto rounded-lg mb-3 object-contain shadow-sm" />
-                                                            ) : (
-                                                                <i className="fa-solid fa-file-pdf text-5xl text-red-500 mb-3"></i>
-                                                            )}
-                                                            <p className="text-sm font-bold text-[#059669] truncate">{fileBerkas.name}</p>
-                                                        </div>
-                                                    ) : (
-                                                        <div>
-                                                            <i className="fa-solid fa-file-arrow-up text-4xl text-gray-400 mb-3"></i>
-                                                            <p className="text-sm text-gray-600 font-medium">Pilih file dari perangkat Anda</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                
-                                                <button type="submit" disabled={isUploadingBerkas || !fileBerkas} className="w-full py-3.5 bg-[#059669] hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                                                    {isUploadingBerkas ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-cloud-arrow-up"></i>}
-                                                    {isUploadingBerkas ? 'Menyimpan ke Drive...' : 'Unggah Berkas Sekarang'}
-                                                </button>
+<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    {/* Box NISN */}
+    <div className="file-drop-area relative p-4 rounded-xl bg-gray-50 text-center cursor-pointer">
+        <h5 className="font-bold text-gray-700 text-sm mb-2">1. Kartu NISN</h5>
+        <input type="file" required accept="image/jpeg, image/png, application/pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => handleFileSelect(e, setFileNisn)} />
+        {fileNisn ? (
+            <div>
+                {fileNisn.preview ? <img src={fileNisn.preview} className="h-20 mx-auto rounded-lg mb-2 object-contain" /> : <i className="fa-solid fa-file-pdf text-3xl text-red-500 mb-2"></i>}
+                <p className="text-xs font-bold text-[#059669] truncate px-2">{fileNisn.name}</p>
+            </div>
+        ) : (
+            <div className="py-4 text-gray-400 hover:text-[#059669]"><i className="fa-solid fa-id-card text-3xl mb-2"></i><p className="text-xs">Klik / Tarik File</p></div>
+        )}
+    </div>
+
+    {/* Box KK */}
+    <div className="file-drop-area relative p-4 rounded-xl bg-gray-50 text-center cursor-pointer">
+        <h5 className="font-bold text-gray-700 text-sm mb-2">2. Kartu Keluarga (KK)</h5>
+        <input type="file" required accept="image/jpeg, image/png, application/pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => handleFileSelect(e, setFileKk)} />
+        {fileKk ? (
+            <div>
+                {fileKk.preview ? <img src={fileKk.preview} className="h-20 mx-auto rounded-lg mb-2 object-contain" /> : <i className="fa-solid fa-file-pdf text-3xl text-red-500 mb-2"></i>}
+                <p className="text-xs font-bold text-[#059669] truncate px-2">{fileKk.name}</p>
+            </div>
+        ) : (
+            <div className="py-4 text-gray-400 hover:text-[#059669]"><i className="fa-solid fa-users text-3xl mb-2"></i><p className="text-xs">Klik / Tarik File</p></div>
+        )}
+    </div>
+
+    {/* Box AKTA */}
+    <div className="file-drop-area relative p-4 rounded-xl bg-gray-50 text-center cursor-pointer">
+        <h5 className="font-bold text-gray-700 text-sm mb-2">3. Akta Kelahiran</h5>
+        <input type="file" required accept="image/jpeg, image/png, application/pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => handleFileSelect(e, setFileAkta)} />
+        {fileAkta ? (
+            <div>
+                {fileAkta.preview ? <img src={fileAkta.preview} className="h-20 mx-auto rounded-lg mb-2 object-contain" /> : <i className="fa-solid fa-file-pdf text-3xl text-red-500 mb-2"></i>}
+                <p className="text-xs font-bold text-[#059669] truncate px-2">{fileAkta.name}</p>
+            </div>
+        ) : (
+            <div className="py-4 text-gray-400 hover:text-[#059669]"><i className="fa-solid fa-child-reaching text-3xl mb-2"></i><p className="text-xs">Klik / Tarik File</p></div>
+        )}
+    </div>
+</div>
+
+<button type="submit" disabled={isUploadingBerkas || !fileNisn || !fileKk || !fileAkta} className="w-full py-3.5 bg-[#059669] hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+    {isUploadingBerkas ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-cloud-arrow-up"></i>}
+    {isUploadingBerkas ? 'Mengunggah 3 Berkas ke Drive...' : 'Unggah Semua Berkas'}
+</button>
                                             </form>
                                         )}
                                     </div>
