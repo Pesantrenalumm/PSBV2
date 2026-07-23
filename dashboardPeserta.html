@@ -12,16 +12,20 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        body { background-color: #f0fdf4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        // API URL Google Apps Script yang sudah dipasang
         const API_URL = "https://script.google.com/macros/s/AKfycbxfRUW-F3ivvv1l1PUeKnzPdZkWVR6n4pBfcg7TbKhWUeeUzIdvHQGPplTRXKITDIsnjw/exec";
 
         const DashboardScreen = () => {
@@ -30,15 +34,12 @@
             const [dataServer, setDataServer] = React.useState(null);
             const [isLoadingData, setIsLoadingData] = React.useState(true);
 
-            // Fungsi Satpam (Pengecekan Keamanan)
             React.useEffect(() => {
                 const savedSession = localStorage.getItem('psb_session');
                 if (!savedSession) {
-                    // Jika tidak ada data sesi, tendang ke halaman login
                     window.location.href = 'index.html';
                     return;
                 }
-                
                 const parsedSession = JSON.parse(savedSession);
                 setSession(parsedSession);
                 fetchData(parsedSession.user.noWa);
@@ -52,9 +53,7 @@
                         body: JSON.stringify({ action: 'getDataPeserta', payload: { noWa: noWa } })
                     });
                     const res = await response.json();
-                    if(res.success) {
-                        setDataServer(res.dataUser);
-                    }
+                    if(res.success) setDataServer(res.dataUser);
                 } catch(err) {
                     console.error("Gagal menarik data dari server.");
                 } finally {
@@ -64,93 +63,156 @@
 
             const handleLogout = () => {
                 localStorage.removeItem('psb_session');
-                window.location.href = 'index.html'; // Kembali ke halaman login
+                window.location.href = 'index.html';
             };
 
-            // Tampilan Loading saat mengecek Sesi dan Data Server
             if (isLoadingData || !dataServer) {
                 return (
-                    <div className="min-h-screen bg-gray-50 flex items-center justify-center text-green-600 flex-col gap-4">
+                    <div className="min-h-screen flex items-center justify-center text-[#059669] flex-col gap-4">
                         <i className="fa-solid fa-circle-notch fa-spin text-4xl"></i>
-                        <p className="font-semibold text-gray-600">Menarik data terbaru dari server...</p>
+                        <p className="font-semibold text-gray-600">Memuat Dashboard...</p>
                     </div>
                 );
             }
 
-            // Logika Kunci Tab Ujian
             const isTesLocked = dataServer.statusPembayaran !== "Lunas" || dataServer.statusBerkas !== "Valid";
+            const initialName = dataServer.nama.charAt(0).toUpperCase();
+            
+            // Logika sederhana untuk stepper
+            let currentStep = 1;
+            if (dataServer.statusPembayaran === 'Lunas') currentStep = 3;
+            else if (dataServer.statusPembayaran === 'Menunggu Verifikasi') currentStep = 2;
+
+            const tabs = [
+                { id: 'home', icon: 'fa-house', label: 'Beranda' },
+                { id: 'pembayaran', icon: 'fa-wallet', label: 'Pembayaran' },
+                { id: 'biodata', icon: 'fa-user-pen', label: 'Lengkapi Biodata' },
+                { id: 'berkas', icon: 'fa-file-arrow-up', label: 'Unggah Berkas' }
+            ];
 
             return (
-                <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row animate-fade-in">
-                    {/* Sidebar */}
-                    <div className="bg-green-800 text-white w-full md:w-64 flex flex-col">
-                        <div className="p-4 border-b border-green-700 text-center">
-                            <i className="fa-solid fa-graduation-cap text-3xl mb-2"></i>
-                            <h2 className="font-bold">Dashboard Calon Santri</h2>
-                            <p className="text-green-300 text-xs mt-1">{dataServer.jenjang} - {dataServer.gender}</p>
+                <div className="min-h-screen flex flex-col md:flex-row">
+                    {/* Sidebar Klasik Putih */}
+                    <div className="bg-white w-full md:w-72 flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 border-r border-gray-100">
+                        <div className="p-8 flex flex-col items-center border-b border-gray-50">
+                            <div className="text-[#059669] mb-2"><i className="fa-solid fa-graduation-cap text-4xl"></i></div>
+                            <h2 className="font-extrabold text-xl text-gray-800 tracking-tight">PSB Online</h2>
+                            <p className="text-[10px] font-bold text-gray-400 tracking-widest mt-1">DASHBOARD SANTRI</p>
                         </div>
-                        <nav className="flex-1 p-4 space-y-2">
-                            <button onClick={() => setActiveTab('home')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left transition-colors ${activeTab === 'home' ? 'bg-green-600' : 'hover:bg-green-700'}`}>
-                                <i className="fa-solid fa-house w-5 text-center"></i> Beranda
+                        
+                        <nav className="flex-1 p-4 space-y-1 mt-4">
+                            {tabs.map(tab => (
+                                <button key={tab.id} onClick={() => setActiveTab(tab.id)} 
+                                    className={`w-full flex items-center gap-4 px-6 py-3.5 rounded-xl text-left font-semibold transition-all ${activeTab === tab.id ? 'bg-[#059669] text-white shadow-md shadow-emerald-200' : 'text-gray-500 hover:bg-emerald-50 hover:text-[#059669]'}`}>
+                                    <i className={`fa-solid ${tab.icon} w-5 text-center text-lg`}></i> {tab.label}
+                                </button>
+                            ))}
+                            
+                            {/* Tab Tes (Terkunci/Terbuka) */}
+                            <button onClick={() => !isTesLocked && setActiveTab('tes')} 
+                                className={`w-full flex items-center justify-between px-6 py-3.5 rounded-xl text-left font-semibold transition-all mt-1 ${activeTab === 'tes' ? 'bg-[#059669] text-white shadow-md' : (isTesLocked ? 'text-gray-400 cursor-not-allowed' : 'text-gray-500 hover:bg-emerald-50 hover:text-[#059669]')}`}>
+                                <div className="flex items-center gap-4">
+                                    <i className={`fa-solid fa-calendar-check w-5 text-center text-lg`}></i> Jadwal & Tes
+                                </div>
+                                {isTesLocked && <i className="fa-solid fa-lock text-sm opacity-50"></i>}
                             </button>
-                            <button onClick={() => setActiveTab('biodata')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left transition-colors ${activeTab === 'biodata' ? 'bg-green-600' : 'hover:bg-green-700'}`}>
-                                <i className="fa-solid fa-address-card w-5 text-center"></i> Biodata Lengkap
-                            </button>
-                            <button onClick={() => setActiveTab('berkas')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left transition-colors ${activeTab === 'berkas' ? 'bg-green-600' : 'hover:bg-green-700'}`}>
-                                <i className="fa-solid fa-folder-open w-5 text-center"></i> Unggah Berkas
-                            </button>
-                            <button onClick={() => setActiveTab('pembayaran')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left transition-colors ${activeTab === 'pembayaran' ? 'bg-green-600' : 'hover:bg-green-700'}`}>
-                                <i className="fa-solid fa-wallet w-5 text-center"></i> Pembayaran
-                            </button>
-                            <button onClick={() => !isTesLocked && setActiveTab('tes')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left transition-colors ${activeTab === 'tes' ? 'bg-green-600' : (isTesLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700')}`}>
-                                <i className={`fa-solid w-5 text-center ${isTesLocked ? 'fa-lock' : 'fa-file-signature'}`}></i> Jadwal & Tes
+
+                            <button onClick={() => setActiveTab('pengumuman')} 
+                                className={`w-full flex items-center gap-4 px-6 py-3.5 rounded-xl text-left font-semibold transition-all mt-1 ${activeTab === 'pengumuman' ? 'bg-[#059669] text-white shadow-md' : 'text-gray-500 hover:bg-emerald-50 hover:text-[#059669]'}`}>
+                                <i className="fa-solid fa-bullhorn w-5 text-center text-lg"></i> Pengumuman
                             </button>
                         </nav>
-                        <div className="p-4 border-t border-green-700">
-                            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2 rounded text-red-300 hover:text-white hover:bg-red-600 transition-colors">
-                                <i className="fa-solid fa-arrow-right-from-bracket"></i> Keluar
+
+                        <div className="p-6">
+                            <button onClick={handleLogout} className="w-full flex items-center gap-4 px-6 py-3 rounded-xl text-red-500 font-semibold hover:bg-red-50 transition-colors">
+                                <i className="fa-solid fa-arrow-right-from-bracket w-5 text-center text-lg"></i> Keluar Aplikasi
                             </button>
                         </div>
                     </div>
 
                     {/* Konten Utama */}
-                    <div className="flex-1 p-6 overflow-y-auto">
-                        <h1 className="text-2xl font-bold text-gray-800 mb-6">Halo, {dataServer.nama}!</h1>
+                    <div className="flex-1 overflow-y-auto bg-[#f8fafc]">
+                        {/* Header Atas */}
+                        <div className="bg-white/80 backdrop-blur-md sticky top-0 z-20 px-8 py-5 flex justify-between items-center border-b border-gray-100">
+                            <h1 className="text-2xl font-extrabold text-gray-800 capitalize">{activeTab === 'home' ? 'Beranda' : activeTab.replace('-', ' ')}</h1>
+                            
+                            <div className="flex items-center gap-3 bg-white border border-gray-100 py-1.5 pl-1.5 pr-4 rounded-full shadow-sm">
+                                <div className="w-10 h-10 rounded-full bg-emerald-100 text-[#059669] flex items-center justify-center font-bold text-lg">{initialName}</div>
+                                <div className="hidden md:block">
+                                    <p className="text-sm font-bold text-gray-700 leading-tight">{dataServer.nama}</p>
+                                    <p className="text-[11px] text-gray-500">{dataServer.statusKelulusan}</p>
+                                </div>
+                            </div>
+                        </div>
 
-                        {activeTab === 'home' && (
-                            <div className="space-y-6">
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                                    <h3 className="font-bold text-gray-800 mb-4">Status Pendaftaran Anda</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className={`p-4 rounded-lg border ${dataServer.statusPembayaran === 'Lunas' ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                                            <p className="text-sm text-gray-600">Status Pembayaran</p>
-                                            <p className={`font-bold ${dataServer.statusPembayaran === 'Lunas' ? 'text-green-700' : 'text-yellow-700'}`}>{dataServer.statusPembayaran}</p>
+                        <div className="p-8 max-w-5xl mx-auto animate-fade-in">
+                            {activeTab === 'home' && (
+                                <div className="space-y-6">
+                                    {/* Banner Selamat Datang */}
+                                    <div className="bg-[#059669] rounded-2xl p-8 text-white shadow-lg shadow-emerald-200 relative overflow-hidden">
+                                        <div className="absolute -right-10 -bottom-10 opacity-10"><i className="fa-solid fa-graduation-cap text-9xl"></i></div>
+                                        <div className="relative z-10">
+                                            <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm rounded-lg text-xs font-bold tracking-wider mb-4 uppercase">
+                                                {dataServer.jenisPendaftar} - {dataServer.jenjang} {dataServer.gender}
+                                            </span>
+                                            <h2 className="text-3xl md:text-4xl font-extrabold mb-3">Ahlan wa Sahlan, {dataServer.nama}!</h2>
+                                            <p className="text-emerald-50 max-w-2xl leading-relaxed">Selamat datang di portal Penerimaan Santri Baru. Silakan lengkapi tahapan di bawah ini agar Anda dapat segera mencetak Kartu Ujian.</p>
                                         </div>
-                                        <div className={`p-4 rounded-lg border ${dataServer.statusBerkas === 'Valid' ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                                            <p className="text-sm text-gray-600">Status Berkas</p>
-                                            <p className={`font-bold ${dataServer.statusBerkas === 'Valid' ? 'text-green-700' : 'text-yellow-700'}`}>{dataServer.statusBerkas}</p>
+                                    </div>
+
+                                    {/* Card Progres */}
+                                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                                        <h3 className="font-bold text-gray-800 text-lg mb-6">Progres Pendaftaran Anda</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                                            <div className={`p-6 rounded-2xl border-2 ${currentStep >= 1 ? 'border-emerald-100 bg-emerald-50/50' : 'border-gray-50 bg-gray-50'}`}>
+                                                <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center text-xl font-bold mb-3 ${currentStep >= 1 ? 'bg-emerald-100 text-[#059669]' : 'bg-gray-200 text-gray-400'}`}>1</div>
+                                                <h4 className={`font-bold ${currentStep >= 1 ? 'text-gray-800' : 'text-gray-400'}`}>Biodata & Berkas</h4>
+                                                <p className="text-xs text-gray-500 mt-1">Harap lengkapi</p>
+                                            </div>
+                                            <div className={`p-6 rounded-2xl border-2 ${currentStep >= 2 ? 'border-emerald-100 bg-emerald-50/50' : 'border-gray-50 bg-gray-50'}`}>
+                                                <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center text-xl font-bold mb-3 ${currentStep >= 2 ? 'bg-emerald-100 text-[#059669]' : 'bg-gray-200 text-gray-400'}`}>2</div>
+                                                <h4 className={`font-bold ${currentStep >= 2 ? 'text-gray-800' : 'text-gray-400'}`}>Pembayaran</h4>
+                                                <p className="text-xs text-gray-500 mt-1">{dataServer.statusPembayaran === 'Belum' ? 'Belum Diverifikasi' : dataServer.statusPembayaran}</p>
+                                            </div>
+                                            <div className={`p-6 rounded-2xl border-2 flex flex-col items-center justify-center ${currentStep >= 3 ? 'border-emerald-100 bg-emerald-50/50' : 'border-gray-50 bg-gray-50'}`}>
+                                                <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center text-xl font-bold mb-3 ${currentStep >= 3 ? 'bg-emerald-100 text-[#059669]' : 'bg-gray-100 text-gray-300'}`}>
+                                                    {currentStep >= 3 ? '3' : <i className="fa-solid fa-lock"></i>}
+                                                </div>
+                                                <h4 className={`font-bold ${currentStep >= 3 ? 'text-gray-800' : 'text-gray-400'}`}>Ujian Seleksi</h4>
+                                                <p className="text-xs text-gray-500 mt-1">{currentStep >= 3 ? 'Terbuka' : 'Terkunci hingga Lunas'}</p>
+                                            </div>
                                         </div>
-                                        <div className="p-4 rounded-lg border bg-blue-50 border-blue-200">
-                                            <p className="text-sm text-gray-600">Hasil Akhir Kelulusan</p>
-                                            <p className="font-bold text-blue-700">{dataServer.statusKelulusan}</p>
+                                    </div>
+
+                                    {/* Card Pengumuman */}
+                                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <i className="fa-solid fa-bell text-yellow-500 text-xl"></i>
+                                            <h3 className="font-bold text-gray-800 text-lg">Pengumuman Terbaru</h3>
+                                        </div>
+                                        
+                                        <div className="bg-red-50/50 border border-red-100 rounded-xl p-5">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h4 className="font-bold text-gray-800">Batas Akhir Pembayaran</h4>
+                                                <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">Penting</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 mb-3">Harap segera menyelesaikan pembayaran pendaftaran agar dapat mengikuti tes seleksi.</p>
+                                            <p className="text-xs text-gray-400">23 Jul 2026</p>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-xl text-indigo-800 flex items-start gap-4">
-                                    <i className="fa-solid fa-bullhorn text-2xl mt-1"></i>
-                                    <div>
-                                        <h3 className="font-bold">Pengumuman Terbaru</h3>
-                                        <p className="text-sm mt-1">Selamat datang di Portal PSB. Segera lengkapi Biodata dan lakukan Pembayaran Pendaftaran agar Anda dapat mengikuti Tes Seleksi.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                            )}
 
-                        {activeTab !== 'home' && (
-                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center min-h-[300px] text-gray-500">
-                                <p><i className="fa-solid fa-screwdriver-wrench mr-2"></i> Form {activeTab} sedang dalam perancangan...</p>
-                            </div>
-                        )}
+                            {activeTab !== 'home' && (
+                                <div className="bg-white p-12 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[400px] text-center">
+                                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-gray-300 text-3xl mb-4">
+                                        <i className="fa-solid fa-person-digging"></i>
+                                    </div>
+                                    <h3 className="text-xl font-bold text-gray-700 mb-2">Modul {activeTab}</h3>
+                                    <p className="text-gray-500 max-w-md">Halaman ini sedang dalam tahap pengembangan desain dan akan segera dirilis oleh sistem.</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             );
