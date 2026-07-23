@@ -12,10 +12,9 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        body { background-color: #f0fdf4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #eef8f1; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .animate-fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -26,6 +25,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // GANTI DENGAN URL WEB APP GAS ANDA
         const API_URL = "https://script.google.com/macros/s/AKfycbxfRUW-F3ivvv1l1PUeKnzPdZkWVR6n4pBfcg7TbKhWUeeUzIdvHQGPplTRXKITDIsnjw/exec";
 
         const DashboardScreen = () => {
@@ -33,6 +33,7 @@
             const [activeTab, setActiveTab] = React.useState('home');
             const [dataServer, setDataServer] = React.useState(null);
             const [isLoadingData, setIsLoadingData] = React.useState(true);
+            const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false); // State untuk Hamburger Menu
 
             React.useEffect(() => {
                 const savedSession = localStorage.getItem('psb_session');
@@ -42,15 +43,16 @@
                 }
                 const parsedSession = JSON.parse(savedSession);
                 setSession(parsedSession);
-                fetchData(parsedSession.user.noWa);
+                // Menarik data menggunakan UserID
+                fetchData(parsedSession.user.userID);
             }, []);
 
-            const fetchData = async (noWa) => {
+            const fetchData = async (userID) => {
                 setIsLoadingData(true);
                 try {
                     const response = await fetch(API_URL, {
                         method: 'POST',
-                        body: JSON.stringify({ action: 'getDataPeserta', payload: { noWa: noWa } })
+                        body: JSON.stringify({ action: 'getDataPeserta', payload: { userID: userID } })
                     });
                     const res = await response.json();
                     if(res.success) setDataServer(res.dataUser);
@@ -66,9 +68,14 @@
                 window.location.href = 'index.html';
             };
 
+            const handleTabClick = (tabId) => {
+                setActiveTab(tabId);
+                setIsMobileMenuOpen(false); // Otomatis tutup menu di HP setelah klik
+            }
+
             if (isLoadingData || !dataServer) {
                 return (
-                    <div className="min-h-screen flex items-center justify-center text-[#059669] flex-col gap-4">
+                    <div className="min-h-screen flex items-center justify-center text-[#059669] flex-col gap-4 bg-[#eef8f1]">
                         <i className="fa-solid fa-circle-notch fa-spin text-4xl"></i>
                         <p className="font-semibold text-gray-600">Memuat Dashboard...</p>
                     </div>
@@ -78,7 +85,6 @@
             const isTesLocked = dataServer.statusPembayaran !== "Lunas" || dataServer.statusBerkas !== "Valid";
             const initialName = dataServer.nama.charAt(0).toUpperCase();
             
-            // Logika sederhana untuk stepper
             let currentStep = 1;
             if (dataServer.statusPembayaran === 'Lunas') currentStep = 3;
             else if (dataServer.statusPembayaran === 'Menunggu Verifikasi') currentStep = 2;
@@ -91,25 +97,36 @@
             ];
 
             return (
-                <div className="min-h-screen flex flex-col md:flex-row">
-                    {/* Sidebar Klasik Putih */}
-                    <div className="bg-white w-full md:w-72 flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 border-r border-gray-100">
-                        <div className="p-8 flex flex-col items-center border-b border-gray-50">
+                <div className="min-h-screen flex bg-[#eef8f1]">
+                    
+                    {/* OVERLAY HITAM UNTUK MENU HP */}
+                    {isMobileMenuOpen && (
+                        <div className="fixed inset-0 bg-black/50 z-20 md:hidden transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
+                    )}
+
+                    {/* SIDEBAR (Slide in/out untuk HP, Fixed untuk PC) */}
+                    <div className={`fixed inset-y-0 left-0 bg-white w-72 flex flex-col shadow-2xl md:shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-30 transform transition-transform duration-300 md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} border-r border-gray-100`}>
+                        
+                        <div className="p-8 flex flex-col items-center border-b border-gray-50 relative">
+                            {/* Tombol Tutup Sidebar untuk HP */}
+                            <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
+                                <i className="fa-solid fa-xmark text-xl"></i>
+                            </button>
+
                             <div className="text-[#059669] mb-2"><i className="fa-solid fa-graduation-cap text-4xl"></i></div>
                             <h2 className="font-extrabold text-xl text-gray-800 tracking-tight">PSB Online</h2>
                             <p className="text-[10px] font-bold text-gray-400 tracking-widest mt-1">DASHBOARD SANTRI</p>
                         </div>
                         
-                        <nav className="flex-1 p-4 space-y-1 mt-4">
+                        <nav className="flex-1 p-4 space-y-1 mt-4 overflow-y-auto">
                             {tabs.map(tab => (
-                                <button key={tab.id} onClick={() => setActiveTab(tab.id)} 
+                                <button key={tab.id} onClick={() => handleTabClick(tab.id)} 
                                     className={`w-full flex items-center gap-4 px-6 py-3.5 rounded-xl text-left font-semibold transition-all ${activeTab === tab.id ? 'bg-[#059669] text-white shadow-md shadow-emerald-200' : 'text-gray-500 hover:bg-emerald-50 hover:text-[#059669]'}`}>
                                     <i className={`fa-solid ${tab.icon} w-5 text-center text-lg`}></i> {tab.label}
                                 </button>
                             ))}
                             
-                            {/* Tab Tes (Terkunci/Terbuka) */}
-                            <button onClick={() => !isTesLocked && setActiveTab('tes')} 
+                            <button onClick={() => { if(!isTesLocked) handleTabClick('tes'); }} 
                                 className={`w-full flex items-center justify-between px-6 py-3.5 rounded-xl text-left font-semibold transition-all mt-1 ${activeTab === 'tes' ? 'bg-[#059669] text-white shadow-md' : (isTesLocked ? 'text-gray-400 cursor-not-allowed' : 'text-gray-500 hover:bg-emerald-50 hover:text-[#059669]')}`}>
                                 <div className="flex items-center gap-4">
                                     <i className={`fa-solid fa-calendar-check w-5 text-center text-lg`}></i> Jadwal & Tes
@@ -117,7 +134,7 @@
                                 {isTesLocked && <i className="fa-solid fa-lock text-sm opacity-50"></i>}
                             </button>
 
-                            <button onClick={() => setActiveTab('pengumuman')} 
+                            <button onClick={() => handleTabClick('pengumuman')} 
                                 className={`w-full flex items-center gap-4 px-6 py-3.5 rounded-xl text-left font-semibold transition-all mt-1 ${activeTab === 'pengumuman' ? 'bg-[#059669] text-white shadow-md' : 'text-gray-500 hover:bg-emerald-50 hover:text-[#059669]'}`}>
                                 <i className="fa-solid fa-bullhorn w-5 text-center text-lg"></i> Pengumuman
                             </button>
@@ -130,38 +147,43 @@
                         </div>
                     </div>
 
-                    {/* Konten Utama */}
-                    <div className="flex-1 overflow-y-auto bg-[#f8fafc]">
+                    {/* KONTEN UTAMA */}
+                    <div className="flex-1 overflow-y-auto h-screen relative">
                         {/* Header Atas */}
-                        <div className="bg-white/80 backdrop-blur-md sticky top-0 z-20 px-8 py-5 flex justify-between items-center border-b border-gray-100">
-                            <h1 className="text-2xl font-extrabold text-gray-800 capitalize">{activeTab === 'home' ? 'Beranda' : activeTab.replace('-', ' ')}</h1>
+                        <div className="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-4 md:px-8 py-4 md:py-5 flex justify-between items-center border-b border-gray-100 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                {/* Hamburger Button untuk HP */}
+                                <button className="md:hidden text-gray-600 hover:text-[#059669] focus:outline-none" onClick={() => setIsMobileMenuOpen(true)}>
+                                    <i className="fa-solid fa-bars text-2xl"></i>
+                                </button>
+                                <h1 className="text-xl md:text-2xl font-extrabold text-gray-800 capitalize hidden sm:block">{activeTab === 'home' ? 'Beranda' : activeTab.replace('-', ' ')}</h1>
+                            </div>
                             
                             <div className="flex items-center gap-3 bg-white border border-gray-100 py-1.5 pl-1.5 pr-4 rounded-full shadow-sm">
                                 <div className="w-10 h-10 rounded-full bg-emerald-100 text-[#059669] flex items-center justify-center font-bold text-lg">{initialName}</div>
-                                <div className="hidden md:block">
+                                <div>
                                     <p className="text-sm font-bold text-gray-700 leading-tight">{dataServer.nama}</p>
-                                    <p className="text-[11px] text-gray-500">{dataServer.statusKelulusan}</p>
+                                    <p className="text-[11px] text-gray-500 font-mono tracking-wider">{dataServer.userID}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="p-8 max-w-5xl mx-auto animate-fade-in">
+                        {/* Area Konten Dinamis */}
+                        <div className="p-4 md:p-8 max-w-5xl mx-auto animate-fade-in">
                             {activeTab === 'home' && (
                                 <div className="space-y-6">
-                                    {/* Banner Selamat Datang */}
-                                    <div className="bg-[#059669] rounded-2xl p-8 text-white shadow-lg shadow-emerald-200 relative overflow-hidden">
+                                    <div className="bg-[#059669] rounded-2xl p-6 md:p-8 text-white shadow-lg shadow-emerald-200 relative overflow-hidden">
                                         <div className="absolute -right-10 -bottom-10 opacity-10"><i className="fa-solid fa-graduation-cap text-9xl"></i></div>
                                         <div className="relative z-10">
                                             <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm rounded-lg text-xs font-bold tracking-wider mb-4 uppercase">
                                                 {dataServer.jenisPendaftar} - {dataServer.jenjang} {dataServer.gender}
                                             </span>
                                             <h2 className="text-3xl md:text-4xl font-extrabold mb-3">Ahlan wa Sahlan, {dataServer.nama}!</h2>
-                                            <p className="text-emerald-50 max-w-2xl leading-relaxed">Selamat datang di portal Penerimaan Santri Baru. Silakan lengkapi tahapan di bawah ini agar Anda dapat segera mencetak Kartu Ujian.</p>
+                                            <p className="text-emerald-50 max-w-2xl leading-relaxed text-sm md:text-base">Selamat datang di portal Penerimaan Santri Baru. Silakan lengkapi tahapan di bawah ini agar Anda dapat segera mencetak Kartu Ujian.</p>
                                         </div>
                                     </div>
 
-                                    {/* Card Progres */}
-                                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                                    <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
                                         <h3 className="font-bold text-gray-800 text-lg mb-6">Progres Pendaftaran Anda</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                                             <div className={`p-6 rounded-2xl border-2 ${currentStep >= 1 ? 'border-emerald-100 bg-emerald-50/50' : 'border-gray-50 bg-gray-50'}`}>
@@ -184,8 +206,7 @@
                                         </div>
                                     </div>
 
-                                    {/* Card Pengumuman */}
-                                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                                    <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
                                         <div className="flex items-center gap-3 mb-6">
                                             <i className="fa-solid fa-bell text-yellow-500 text-xl"></i>
                                             <h3 className="font-bold text-gray-800 text-lg">Pengumuman Terbaru</h3>
@@ -204,12 +225,12 @@
                             )}
 
                             {activeTab !== 'home' && (
-                                <div className="bg-white p-12 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[400px] text-center">
-                                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-gray-300 text-3xl mb-4">
+                                <div className="bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[400px] text-center">
+                                    <div className="w-20 h-20 bg-[#eef8f1] rounded-full flex items-center justify-center text-[#059669] text-3xl mb-4">
                                         <i className="fa-solid fa-person-digging"></i>
                                     </div>
                                     <h3 className="text-xl font-bold text-gray-700 mb-2">Modul {activeTab}</h3>
-                                    <p className="text-gray-500 max-w-md">Halaman ini sedang dalam tahap pengembangan desain dan akan segera dirilis oleh sistem.</p>
+                                    <p className="text-gray-500 max-w-md text-sm md:text-base">Halaman ini sedang dalam tahap pengembangan desain dan akan segera dirilis oleh sistem.</p>
                                 </div>
                             )}
                         </div>
