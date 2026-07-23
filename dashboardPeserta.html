@@ -113,14 +113,17 @@
                 window.location.href = 'index.html';
             };
 
-            const handleTabClick = (tabId) => {
-                setActiveTab(tabId);
-                setIsMobileMenuOpen(false); 
-                setPesan({ type: '', text: '' });
-                // Reset file state saat pindah tab
-                setFileBayar(null); 
-                setFileBerkas(null);
-            };
+          const handleTabClick = (tabId) => {
+    setActiveTab(tabId);
+    setIsMobileMenuOpen(false); 
+    setPesan({ type: '', text: '' });
+    
+    // Reset semua file state saat pindah tab agar tidak error
+    setFileBayar(null); 
+    setFileNisn(null);
+    setFileKk(null);
+    setFileAkta(null);
+};
 
             // FUNGSI SIMPAN BIODATA
             const handleSimpanBiodata = async (e) => {
