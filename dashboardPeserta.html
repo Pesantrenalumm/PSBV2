@@ -492,43 +492,139 @@ const handleUploadBerkas = async (e) => {
                                 </div>
                             )}
 
-                            {/* TAB: BERKAS */}
-                            {activeTab === 'berkas' && (
-                                <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
-                                    <div className="mb-8 border-b border-gray-100 pb-4">
-                                        <h2 className="text-2xl font-extrabold text-gray-800">Unggah Berkas Persyaratan</h2>
-                                        <p className="text-gray-500 mt-1 text-sm">Lengkapi dokumen untuk keperluan administrasi santri.</p>
-                                    </div>
+                           {/* TAB: BERKAS */}
+{activeTab === 'berkas' && (
+    <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
 
-                                    <div className="max-w-xl mx-auto">
-                                        <h3 className="font-bold text-gray-800 mb-3">Status Saat Ini: 
-                                            <span className={`ml-2 px-3 py-1 rounded-full text-xs ${dataServer.statusBerkas === 'Valid' ? 'bg-emerald-100 text-emerald-700' : (dataServer.statusBerkas === 'Menunggu Verifikasi' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')}`}>
-                                                {dataServer.statusBerkas}
-                                            </span>
-                                        </h3>
+        <div className="mb-8 border-b border-gray-100 pb-4">
+            <h2 className="text-2xl font-extrabold text-gray-800">
+                Unggah Berkas Persyaratan
+            </h2>
+            <p className="text-gray-500 mt-1 text-sm">
+                Lengkapi dokumen untuk keperluan administrasi santri.
+            </p>
+        </div>
 
-                                        {dataServer.statusBerkas === 'Valid' || dataServer.statusBerkas === 'Menunggu Verifikasi' ? (
-                                            <div className="bg-emerald-50 text-[#059669] p-6 rounded-2xl border border-emerald-100 text-center mt-4">
-                                                <i className="fa-solid fa-file-circle-check text-4xl mb-3"></i>
-                                                <h4 className="font-bold">
-                                                    {dataServer.statusBerkas === 'Valid' 
-                                                    ? 'Berkas Valid' 
-                                                    : 'Berkas Sedang Diverifikasi'}
-                                                </h4>
 
-                                                <p className="text-sm mt-1">
-                                                    {dataServer.statusBerkas === 'Valid'
-                                                    ? 'Dokumen Anda telah divalidasi. Tidak perlu mengunggah ulang.'
-                                                    : 'Dokumen Anda telah dikirim dan sedang diperiksa oleh panitia. Silakan menunggu hasil verifikasi.'}
-                                                </p>
-                                        ) : (
-                                            <form onSubmit={handleUploadBerkas} className="mt-6">
-                                                <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-6">
-    <h4 className="font-bold text-blue-800 mb-1 text-sm"><i className="fa-solid fa-circle-info mr-2"></i>Instruksi:</h4>
-    <p className="text-xs text-blue-700">Unggah foto/scan dokumen asli. Pastikan tulisan terbaca jelas. Format JPG/PNG/PDF (Maks 2MB per file).</p>
-</div>
+        <div className="max-w-xl mx-auto">
 
-<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <h3 className="font-bold text-gray-800 mb-3">
+                Status Saat Ini:
+                <span className={`ml-2 px-3 py-1 rounded-full text-xs ${
+                    dataServer.statusBerkas === 'Valid'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : dataServer.statusBerkas === 'Menunggu Verifikasi'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-red-100 text-red-700'
+                }`}>
+                    {dataServer.statusBerkas}
+                </span>
+            </h3>
+
+
+            {
+            dataServer.statusBerkas === 'Valid' ||
+            dataServer.statusBerkas === 'Menunggu Verifikasi'
+            ?
+
+            (
+                <div className="bg-emerald-50 text-[#059669] p-6 rounded-2xl border border-emerald-100 text-center mt-4">
+
+                    <i className={`fa-solid ${
+                        dataServer.statusBerkas === 'Valid'
+                        ? 'fa-file-circle-check'
+                        : 'fa-clock'
+                    } text-4xl mb-3`}>
+                    </i>
+
+
+                    <h4 className="font-bold">
+                        {
+                        dataServer.statusBerkas === 'Valid'
+                        ? 'Berkas Valid'
+                        : 'Berkas Sedang Diverifikasi'
+                        }
+                    </h4>
+
+
+                    <p className="text-sm mt-1">
+                        {
+                        dataServer.statusBerkas === 'Valid'
+                        ?
+                        'Dokumen Anda telah divalidasi. Tidak perlu mengunggah ulang.'
+                        :
+                        'Dokumen Anda telah dikirim dan sedang diperiksa oleh panitia. Silakan menunggu hasil verifikasi.'
+                        }
+                    </p>
+
+                </div>
+            )
+
+
+            :
+
+            (
+
+                <form onSubmit={handleUploadBerkas} className="mt-6">
+
+                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-6">
+
+                        <h4 className="font-bold text-blue-800 mb-1 text-sm">
+                            <i className="fa-solid fa-circle-info mr-2"></i>
+                            Instruksi:
+                        </h4>
+
+                        <p className="text-xs text-blue-700">
+                            Unggah foto/scan dokumen asli. Pastikan tulisan terbaca jelas.
+                            Format JPG/PNG/PDF (Maks 2MB per file).
+                        </p>
+
+                    </div>
+
+
+                    {/* BAGIAN INPUT FILE NISN, KK, AKTA TETAP PAKAI KODE LAMA */}
+                    {/* Jangan ubah bagian ini */}
+
+
+                    <button
+                        type="submit"
+                        disabled={
+                            isUploadingBerkas ||
+                            !fileNisn ||
+                            !fileKk ||
+                            !fileAkta
+                        }
+                        className="w-full py-3.5 bg-[#059669] hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+
+                        {
+                        isUploadingBerkas
+                        ?
+                        <i className="fa-solid fa-circle-notch fa-spin"></i>
+                        :
+                        <i className="fa-solid fa-cloud-arrow-up"></i>
+                        }
+
+                        {
+                        isUploadingBerkas
+                        ?
+                        'Mengunggah 3 Berkas ke Drive...'
+                        :
+                        'Unggah Semua Berkas'
+                        }
+
+                    </button>
+
+                </form>
+
+            )
+
+            }
+
+        </div>
+
+    </div>
+)}
     {/* Box NISN */}
     <div className="file-drop-area relative p-4 rounded-xl bg-gray-50 text-center cursor-pointer">
         <h5 className="font-bold text-gray-700 text-sm mb-2">1. Kartu NISN</h5>
