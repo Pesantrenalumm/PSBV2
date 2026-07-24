@@ -465,6 +465,19 @@ const handleUploadBerkas = async (e) => {
         ? 'Jazakumullah khairan. Pembayaran Anda telah diverifikasi oleh panitia.'
         : 'Bukti pembayaran telah dikirim dan sedang diperiksa oleh bendahara. Silakan menunggu hasil verifikasi.'}
 </p>
+
+
+{dataServer.linkPembayaran && (
+    <a
+        href={dataServer.linkPembayaran}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+    >
+        <i className="fa-solid fa-file-image"></i>
+        Lihat Bukti Pembayaran
+    </a>
+)}
                                                 </div>
                                             ) : (
                                                 <form onSubmit={handleUploadPembayaran} className="mt-4">
